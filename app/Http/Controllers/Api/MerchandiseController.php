@@ -25,7 +25,7 @@ class MerchandiseController extends Controller
             'price' => 'required|numeric',
             'stock' => 'required|integer',
             'status' => 'required|in:In Stock,Out of Stock',
-            'image' => 'nullable|image|max:2048', // max 2MB
+            'image' => 'nullable|image|max:20480', 
         ]);
 
         $imagePath = null;

@@ -45,12 +45,14 @@ class EventController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'date'     => 'required|date',
-            'location' => 'required|string|max:255',
-            'type'     => 'required|string|max:100',
-            'status'   => 'required|in:Upcoming,Completed,Cancelled',
-            'poster'   => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'name'        => 'required|string|max:255',
+            'date'        => 'required|date',
+            'location'    => 'required|string|max:255',
+            'type'        => 'required|string|max:100',
+            'status'      => 'required|in:Upcoming,Completed,Cancelled',
+            'price'       => 'required|numeric|min:0',
+            'description' => 'nullable|string',
+            'poster'      => 'nullable|image|mimes:jpg,jpeg,png,webp|max:20480',
         ]);
 
         if ($request->hasFile('poster')) {
@@ -85,19 +87,20 @@ class EventController extends Controller
     public function update(Request $request, Event $event)
     {
         $data = $request->validate([
-            'name'     => 'sometimes|string|max:255',
-            'date'     => 'sometimes|date',
-            'location' => 'sometimes|string|max:255',
-            'type'     => 'sometimes|string|max:100',
-            'status'   => 'sometimes|in:Upcoming,Completed,Cancelled',
-            'poster'   => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'name'        => 'sometimes|string|max:255',
+            'date'        => 'sometimes|date',
+            'location'    => 'sometimes|string|max:255',
+            'type'        => 'sometimes|string|max:100',
+            'status'      => 'sometimes|in:Upcoming,Completed,Cancelled',
+            'price'       => 'sometimes|numeric|min:0',
+            'description' => 'nullable|string',
+            'poster'      => 'nullable|image|mimes:jpg,jpeg,png,webp|max:20480',
         ]);
 
         if ($request->hasFile('poster')) {
             if ($event->poster) {
                 Storage::disk('public')->delete($event->poster);
             }
-
             $data['poster'] = $request->file('poster')
                 ->store('events', 'public');
         }
