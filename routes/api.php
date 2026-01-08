@@ -10,6 +10,8 @@ use App\Http\Controllers\SeriesController;
 use App\Http\Controllers\ActorController;
 use App\Http\Controllers\DirectorController;
 use App\Http\Controllers\MpesaController;
+use App\Http\Controllers\EventPaymentController;
+use App\Http\Controllers\MerchandiseMpesaController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Response;
@@ -23,6 +25,7 @@ use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\Api\BlogController;
+use App\Http\Controllers\Api\SettingsController;
 
 
 
@@ -69,15 +72,54 @@ Route::middleware('auth:api')->group(function () {
 
     Route::apiResource('blogs', BlogController::class);
 
+    Route::get('/movies', [MovieController::class, 'index']);
+    Route::post('/movies', [MovieController::class, 'store']);
+
+    //settings
+    Route::get('/settings', [SettingsController::class, 'index']);
+    Route::post('/settings', [SettingsController::class, 'update']);
+
+    // routes/api.php
+
+Route::prefix('admin')->group(function () {
+
+    // Payment Plans
+    Route::get('/payment-plans', [PaymentPlanController::class, 'index']);
+    Route::post('/payment-plans', [PaymentPlanController::class, 'store']);
+    Route::get('/payment-plans/{paymentPlan}', [PaymentPlanController::class, 'show']);
+    Route::put('/payment-plans/{paymentPlan}', [PaymentPlanController::class, 'update']);
+    Route::patch('/payment-plans/{paymentPlan}/toggle', [PaymentPlanController::class, 'toggleStatus']);
+    Route::delete('/payment-plans/{paymentPlan}', [PaymentPlanController::class, 'destroy']);
+
+    // Payment Methods
+    Route::get('/payment-methods', [PaymentMethodController::class, 'index']);
+    Route::patch('/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update']);
+    Route::patch('/payment-methods/{paymentMethod}/toggle', [PaymentMethodController::class, 'toggleStatus']);
+
+});
+
+
+
+    Route::post('/movies/verify-code', [MovieAccessController::class, 'verify']);
+    Route::get('/movies/{movie}/stream', [SecureStreamController::class, 'stream'])->name('movies.stream');
+
+    Route::post('/progress', [WatchProgressController::class, 'update']);
+    Route::get('/progress', [WatchProgressController::class, 'list']);
+
+    Route::post('/movies/verify-code', [MovieAccessController::class, 'verify']);
+    Route::get('/movies/{movie}/stream', [SecureStreamController::class, 'stream']);
+
 
 });
   Route::apiResource('events', EventController::class);
   Route::apiResource('merchandise', MerchandiseController::class);
+  Route::middleware('auth:api')->get('/me', [UserProfileController::class, 'me']);
 
 
-  Route::get('/test', function () {
-    return response()->json(['message' => 'API is working']);
-});
+
+//   Route::get('/test', function () {
+//     return response()->json(['message' => 'API is working']);
+// });
 
 
 

@@ -7,94 +7,85 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
+use App\Http\Requests\StoreMovieRequest;
+
 
 
 class MovieController extends Controller
 {
-    public function uploadMovie(Request $request)
+    public function store(StoreMovieRequest $request)
     {
-        try {
-            // Validate input (note: max size for movie is in KB; 6GB = 6291456 KB)
-            $validated = $request->validate([
-                'title'         => 'required|string|max:255',
-                'description'   => 'required|string',
-                'price'         => 'required|numeric',
-                'poster'        => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120', 
-                'category'      => 'required|string',
-                'currency'      => 'required|string',
-                'date_released' => 'required|date',
-                'movie' => 'required|mimes:mp4,mkv,ts|max:6291456',
-            ]);
+        DB::transaction(function () use ($request, &$movie) {
 
-            // Store poster
-            // $posterPath = $request->file('poster')->store('movie_posters', 'public');
+            $movie = Movie::create($request->only([
+                'title',
+                'description',
+                'release_year',
+                'duration',
+                'language',
+                'genre',
+                'status',
+                'rental_price',
+                'purchase_price',
+                'rental_period',
+                'free_preview',
+                'preview_duration',
+                'seo_title',
+                'seo_description',
+                'seo_keywords',
+            ]));
 
-            // Store movie file
-            // $moviePath = $request->file('movie')->store('movies', 'public');
+            // Media uploads
+            if ($request->hasFile('poster')) {
+                $movie->poster_path = $request->file('poster')->store('movies/posters', 'public');
+            }
 
-            // save to assets folder
-             // Prepare paths
-        $movie = $request->file('movie');
-        $poster = $request->file('poster');
+            if ($request->hasFile('trailer')) {
+                $movie->trailer_path = $request->file('trailer')->store('movies/trailers', 'public');
+            }
 
-        $movieName = time() . '_' . $movie->getClientOriginalName();
-        $posterName = time() . '_' . $poster->getClientOriginalName();
+            if ($request->hasFile('movie')) {
+                $movie->movie_path = $request->file('movie')->store('movies/full', 'public');
+            }
 
-        $movieDir = base_path('assets/movies');
-        $posterDir = base_path('assets/movie_posters');
+            $movie->save();
 
-        // Create folders if they don't exist
-        File::ensureDirectoryExists($movieDir);
-        File::ensureDirectoryExists($posterDir);
+            // Cast
+            if ($request->casts) {
+                foreach ($request->casts as $cast) {
+                    $movie->casts()->create(['name' => $cast]);
+                }
+            }
 
-        // Move files
-        $movie->move($movieDir, $movieName);
-        $poster->move($posterDir, $posterName);
+            // Tags
+            if ($request->tags) {
+                $tagIds = collect($request->tags)->map(function ($tag) {
+                    return Tag::firstOrCreate(['name' => $tag])->id;
+                });
+                $movie->tags()->sync($tagIds);
+            }
 
-        // Save paths relative to project root
-        $moviePath = 'assets/movies/' . $movieName;
-        $posterPath = 'assets/movie_posters/' . $posterName;
+            // Subtitles
+            if ($request->hasFile('subtitles')) {
+                foreach ($request->file('subtitles') as $file) {
+                    $movie->subtitles()->create([
+                        'file_path' => $file->store('movies/subtitles', 'public')
+                    ]);
+                }
+            }
+        });
 
-            // Save movie details in the database
-            $movie = Movie::create([
-                'title'        => $validated['title'],
-                'description'  => $validated['description'],
-                'price'        => $validated['price'],
-                'poster'       => $posterPath,
-                'category'     => $validated['category'],
-                'currency'     => $validated['currency'],
-                'date_released'=> $validated['date_released'],
-                'movie'   => $moviePath,
-            ]);
-
-            return response()->json([
-                'message' => 'Movie uploaded successfully',
-                'movie'   => $movie
-            ], 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'error'   => 'Something went wrong',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'message' => 'Movie created successfully',
+            'movie' => $movie->load(['casts', 'tags', 'subtitles'])
+        ], 201);
     }
 
-    public function getMovies()
+    public function index()
     {
-        $movies = Movie::all();
-        return response()->json($movies);
-    }
+        // Load related casts, tags, and subtitles
+        $movies = Movie::with(['casts', 'tags', 'subtitles'])->get();
 
-    public function comingSoonMovies()
-    {
-        $today = Carbon::today();
-        $movies = Movie::where('date_released', '>', $today)
-                        ->orderBy('date_released', 'asc')
-                        ->get();
-
-        return response()->json($movies);
+        return response()->json($movies, 200);
     }
 }
-
-

@@ -7,30 +7,43 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
-
-class Movie extends Model implements HasMedia
+use App\Models\Cast;
+    
+class Movie extends Model
 {
-    use HasFactory, InteractsWithMedia;
-
     protected $fillable = [
         'title',
-        'category',
         'description',
-        'price',
-        'currency',
-        'poster',
-        'date_released',
-        'movie',
+        'release_year',
+        'duration',
+        'language',
+        'genre',
+        'status',
+        'poster_path',
+        'trailer_path',
+        'movie_path',
+        'rental_price',
+        'purchase_price',
+        'rental_period',
+        'free_preview',
+        'preview_duration',
+        'seo_title',
+        'seo_description',
+        'seo_keywords'
     ];
 
-    /**
-     * Register the media collections.
-     */
-    public function registerMediaCollections(): void
+    public function casts()
     {
-        $this->addMediaCollection('movies')->singleFile(); // Stores only one movie file per record
+        return $this->hasMany(Cast::class);
+    }
+
+    public function tags()
+    {
+        return $this->belongsToMany(Tag::class);
+    }
+
+    public function subtitles()
+    {
+        return $this->hasMany(Subtitle::class);
     }
 }
-
-
-
