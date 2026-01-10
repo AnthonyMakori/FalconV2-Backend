@@ -26,6 +26,12 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\Api\BlogController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\PaymentPlanController;
+use App\Http\Controllers\Api\PaymentMethodController;
+use App\Http\Controllers\MovieAccessController;
+use App\Http\Controllers\SecureStreamController;
+use App\Http\Controllers\WatchProgressController;
+
 
 
 
@@ -45,6 +51,37 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+//payment routes
+Route::prefix('c2b')->group(function () {
+    Route::get('register', [MpesaController::class, 'registerC2bUrls']);
+    Route::get('access-token', [MpesaController::class, 'generateAccessToken']);
+    Route::post('validation', [MpesaController::class, 'c2bValidation']);
+    Route::post('confirmation', [MpesaController::class, 'c2bConfirmation']);
+});
+
+Route::prefix('stk')->group(function () {
+    Route::post('initiate', [MpesaController::class, 'initiate']);
+    Route::post('callback', [MpesaController::class, 'callback']);
+});
+
+Route::prefix('banks')->group(function () {
+    Route::get('jenga/test', [MpesaController::class, 'testJenga']);
+    Route::get('jenga/signature', [MpesaController::class, 'generateSignature']);
+    Route::get('jenga/account-balance', [MpesaController::class, 'jengaBalance']);
+    Route::post('jenga/access-token', [MpesaController::class, 'generateJengaToken']);
+    Route::get('jenga/equity', [MpesaController::class, 'initiateEquity']);
+
+    // Route::post('callback', [PaymentsController::class, 'callback']);
+});
+
+Route::prefix('events')->group(function(){
+    Route::post('/stk/initiate', [EventPaymentController::class, 'initiate']);
+    Route::post('/stk/callback', [EventPaymentController::class, 'callback']);
+    });
+
+Route::post('/initiate/merchandise', [MerchandiseMpesaController::class, 'initiate']);
+Route::post('/stk/merchandise-callback', [MerchandiseMpesaController::class, 'merchandiseCallback']);
 
 Route::middleware('auth:api')->group(function () {
 
