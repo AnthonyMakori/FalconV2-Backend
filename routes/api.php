@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\PaymentMethodController;
 use App\Http\Controllers\MovieAccessController;
 use App\Http\Controllers\SecureStreamController;
 use App\Http\Controllers\WatchProgressController;
+use App\Http\Controllers\Api\SubscriberController;
 
 
 
@@ -150,6 +151,8 @@ Route::prefix('admin')->group(function () {
 });
   Route::apiResource('events', EventController::class);
   Route::apiResource('merchandise', MerchandiseController::class);
+  Route::middleware('throttle:10,1')->post('/subscribe', [SubscriberController::class, 'store']);
+
   Route::middleware('auth:api')->get('/me', [UserProfileController::class, 'me']);
 
 
