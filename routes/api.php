@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\MovieController;
 use App\Http\Controllers\EventController;
-use App\Http\Controllers\API\MerchandiseController;
+use App\Http\Controllers\Api\MerchandiseController;
 use App\Http\Controllers\SeriesController;
 use App\Http\Controllers\ActorController;
 use App\Http\Controllers\DirectorController;
@@ -32,7 +32,9 @@ use App\Http\Controllers\MovieAccessController;
 use App\Http\Controllers\SecureStreamController;
 use App\Http\Controllers\WatchProgressController;
 use App\Http\Controllers\Api\SubscriberController;
-
+use App\Http\Controllers\PurchaseController;
+use App\Http\Controllers\WatchlistController;
+use App\Http\Controllers\GenreController;
 
 
 
@@ -49,6 +51,9 @@ use App\Http\Controllers\Api\SubscriberController;
 
 Route::post('/admin/register', [AdminAuthController::class, 'register']);
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
+
+    Route::get('/movies', [MovieController::class, 'index']);
+
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -143,23 +148,84 @@ Route::prefix('admin')->group(function () {
 
     Route::post('/progress', [WatchProgressController::class, 'update']);
     Route::get('/progress', [WatchProgressController::class, 'list']);
+    Route::get('/watch-progress/continue', [WatchProgressController::class, 'continueWatching']);
+    Route::get('/watch-history', [WatchProgressController::class, 'history']);
+    
+    
+    Route::get('/watchlist', [WatchlistController::class, 'index']);
+    Route::post('/watchlist', [WatchlistController::class, 'store']);
+    Route::delete('/watchlist/{movie}', [WatchlistController::class, 'destroy']);
 
     Route::post('/movies/verify-code', [MovieAccessController::class, 'verify']);
     Route::get('/movies/{movie}/stream', [SecureStreamController::class, 'stream']);
+    
+    
+    Route::get('/purchases', [PurchaseController::class, 'index']);
+    Route::get('/purchases/summary', [PurchaseController::class, 'summary']);
+    
+    Route::get('/dashboard/overview', [DashboardController::class, 'overview']);
+    
+    Route::get('/me', [UserController::class, 'me']);
+    
+    
+    Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
+    Route::get('/dashboard/recent-uploads', [DashboardController::class, 'getRecentUploads']);
+    Route::get('/dashboard/recent-activities', [DashboardController::class, 'getRecentActivities']);
+    Route::get('/dashboard/views-overview', [DashboardController::class, 'getViewsOverview']);
+    Route::get('/dashboard/revenue-overview', [DashboardController::class, 'getRevenueOverview']);
+    
+    
+    Route::post('/verify-access-code', [PurchaseController::class, 'verifyAccessCode']);
+    
 
 
 });
   Route::apiResource('events', EventController::class);
   Route::apiResource('merchandise', MerchandiseController::class);
   Route::middleware('throttle:10,1')->post('/subscribe', [SubscriberController::class, 'store']);
+  
+  Route::post('/merchandise-order', [MerchandiseMpesaController::class, 'saveOrderDetails']);
+  Route::get('/merchandise-payment-status/{checkoutRequestId}', [MerchandiseMpesaController::class, 'getPaymentStatus']);
+  
+  Route::get('/movies', [MovieController::class, 'index']);
+//   Route::get('/movies/{movie}', [MovieController::class, 'show']);
+  
+  Route::get('/trending/movie/week', [MovieController::class, 'trending']);
+//   Route::get('/movie/popular', [MovieController::class, 'popular']);
+//   Route::get('/movie/{movie}', [MovieController::class, 'show']);
+//   Route::get('/search/movie', [MovieController::class, 'search']);
+  
+Route::prefix('movie')->group(function () {
 
-  Route::middleware('auth:api')->get('/me', [UserProfileController::class, 'me']);
+    /* ========= STATIC TMDB ROUTES ========= */
+    Route::get('/popular', [MovieController::class, 'popular']);
+    Route::get('/top_rated', [MovieController::class, 'topRated']);
+    Route::get('/now_playing', [MovieController::class, 'nowPlaying']);
+    Route::get('/upcoming', [MovieController::class, 'upcoming']);
+    Route::get('/search', [MovieController::class, 'search']);
+
+    /* ========= DYNAMIC TMDB ROUTES ========= */
+    Route::get('/{id}/recommendations', [MovieController::class, 'recommendations']);
+    Route::get('/{id}/credits', [MovieController::class, 'credits']);
+    Route::get('/{id}', [MovieController::class, 'show']);
+});
+
+   
+   Route::get('/genre/movie/list', [GenreController::class, 'movieGenres']);
 
 
 
- Route::middleware('auth:api')->get('/me', function (Request $request) {
+
+  Route::middleware('auth:api')->get('/me', function (Request $request) {
     return $request->user();
 });
+;
+
+
+
+//   Route::get('/test', function () {
+//     return response()->json(['message' => 'API is working']);
+// });
 
 
 
