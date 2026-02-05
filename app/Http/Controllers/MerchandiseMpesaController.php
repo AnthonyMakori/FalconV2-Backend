@@ -8,14 +8,38 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use App\Models\MerchandisePayment;
 use App\Models\Merchandise;
+use App\Models\MerchandiseOrder;
 use Carbon\Carbon;
 
 class MerchandiseMpesaController extends Controller
 {
-    public function sendConfirmationEmail($email, $itemName, $referralId)
+    // -----------------------------
+    // Send detailed confirmation email
+    // -----------------------------
+    public function sendConfirmationEmail($email, $itemName, $referralId, $amount)
     {
-        $subject = "Merchandise Purchase Confirmation";
-        $messageBody = "Thank you for purchasing '{$itemName}'.\n\nReferral ID: {$referralId}\nWe'll contact you shortly with delivery details.";
+        $subject = "Your Merchandise Purchase Confirmation";
+
+        $messageBody = "
+Hello,
+
+Thank you for your purchase!
+
+Item Purchased: {$itemName}
+Amount Paid: KES {$amount}
+Referral ID: {$referralId}
+Purchase Date: " . now()->format('d M Y H:i') . "
+
+Next Steps:
+Please provide your order details (color, size, location, and preferred contact) to complete the delivery. 
+
+We will contact you shortly once we receive your order details.
+
+Thank you for shopping with us!
+    
+Best Regards,
+Falcon Eye Philmz
+";
 
         Mail::raw($messageBody, function ($message) use ($email, $subject) {
             $message->to($email)
@@ -26,9 +50,11 @@ class MerchandiseMpesaController extends Controller
         return response()->json(['message' => 'Email sent successfully']);
     }
 
+    // -----------------------------
+    // Initiate M-Pesa STK Push
+    // -----------------------------
     public function initiate(Request $request)
     {
-        // Use same keys as working controller
         $consumerKey = 'lFR5oJ6WlODRdctRZRGh46piAYbLvJnE5flitYTPk1DzYGU9';
         $consumerSecret = 'oSklA8P0ZvAnRhR7t80w0Ie46jJQbjXNCLiVTmrcM5ENsSriegI0aSB9Ivg1Gnk1';
 
@@ -36,9 +62,6 @@ class MerchandiseMpesaController extends Controller
         $amount = $request->input('amount');
         $email = $request->input('email');
         $merchandise_id = $request->input('merchandise_id');
-        $color = $request->input('color');
-        $size = $request->input('size');
-        $referral_id = uniqid('ref_');
 
         if (empty($phone_no) || empty($email) || empty($merchandise_id)) {
             return response()->json(['status' => 'error', 'message' => 'Missing required fields'], 400);
@@ -55,6 +78,8 @@ class MerchandiseMpesaController extends Controller
         $passkey = 'd4baaa28ee7b2aee1864a9727884b7130d49ece7c9ac8a3361156cbbaeae6f7e';
         $Timestamp = '20' . date("ymdhis");
         $Password = base64_encode($BusinessShortCode . $passkey . $Timestamp);
+
+        $referral_id = uniqid('ref_');
 
         $payload = [
             'BusinessShortCode' => $BusinessShortCode,
@@ -78,14 +103,12 @@ class MerchandiseMpesaController extends Controller
         $resData = $response->json();
 
         if (isset($resData['CheckoutRequestID'])) {
-            MerchandisePayment::create([
+            $payment = MerchandisePayment::create([
                 'phone' => $phone,
                 'amount' => $amount,
                 'email' => $email,
                 'merchandise_id' => $merchandise_id,
                 'checkout_request_id' => $resData['CheckoutRequestID'],
-                'color' => $color,
-                'size' => $size,
                 'referral_id' => $referral_id,
                 'status' => 'Pending',
             ]);
@@ -96,6 +119,9 @@ class MerchandiseMpesaController extends Controller
         return response()->json($resData);
     }
 
+    // -----------------------------
+    // Generate M-Pesa Access Token
+    // -----------------------------
     private function generateAccessToken($consumerKey, $consumerSecret)
     {
         try {
@@ -121,6 +147,9 @@ class MerchandiseMpesaController extends Controller
         }
     }
 
+    // -----------------------------
+    // Handle M-Pesa Callback
+    // -----------------------------
     public function merchandiseCallback(Request $request)
     {
         Log::info('Merchandise Callback:', $request->all());
@@ -150,12 +179,68 @@ class MerchandiseMpesaController extends Controller
 
             $item = Merchandise::find($payment->merchandise_id);
             if ($item) {
-                $this->sendConfirmationEmail($payment->email, $item->name, $payment->referral_id);
+                // Send improved confirmation email
+                $this->sendConfirmationEmail($payment->email, $item->name, $payment->referral_id, $payment->amount);
             }
+
+            // Return the payment id and item name so frontend can trigger order details modal
+            return response()->json([
+                'ResultCode' => 0,
+                'ResultDesc' => 'Success',
+                'payment_id' => $payment->id,
+                'item_name' => $item?->name,
+            ]);
         } else {
             $payment->update(['status' => 'Failed']);
         }
 
         return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Success']);
     }
+
+    // -----------------------------
+    // Save Order Details after payment
+    // -----------------------------
+    public function saveOrderDetails(Request $request)
+    {
+        $request->validate([
+            'payment_id' => 'required|exists:merchandise_payments,id',
+            'color' => 'required|string',
+            'size' => 'required|string',
+            'preferred_phone' => 'required|string',
+            'location' => 'required|string',
+            'additional_info' => 'nullable|string',
+        ]);
+
+        $order = MerchandiseOrder::create([
+            'payment_id' => $request->payment_id,
+            'color' => $request->color,
+            'size' => $request->size,
+            'preferred_phone' => $request->preferred_phone,
+            'location' => $request->location,
+            'additional_info' => $request->additional_info,
+        ]);
+
+        return response()->json([
+            'message' => 'Order details saved successfully',
+            'order' => $order
+        ]);
+    }
+    
+    public function getPaymentStatus($checkoutRequestId)
+        {
+            $payment = MerchandisePayment::where('checkout_request_id', $checkoutRequestId)->first();
+        
+            if (!$payment) {
+                return response()->json(['status' => 'NotFound']);
+            }
+        
+            $item = Merchandise::find($payment->merchandise_id);
+        
+            return response()->json([
+                'status' => $payment->status,
+                'id' => $payment->id,
+                'item_name' => $item?->name
+            ]);
+        }
+
 }

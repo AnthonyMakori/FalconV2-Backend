@@ -241,6 +241,7 @@ public function sendTicket($email, $event, $ticketCode, $attendeeName = 'Attende
                 'email' => $email,
                 'event_id' => $event_id,
                 'checkout_request_id' => $resData['CheckoutRequestID'],
+                'attendee_name' => $request->input('attendee_name'),
             ]);
         }
 
@@ -250,57 +251,75 @@ public function sendTicket($email, $event, $ticketCode, $attendeeName = 'Attende
     /**
      * M-Pesa Callback
      */
-    public function callback(Request $request)
+  public function callback(Request $request)
     {
-        Log::info('Event Payment Callback:', $request->all());
-
-        $callback = $request->input('Body.stkCallback');
-
+        Log::info('Event Payment Callback RAW:', $request->all());
+    
+        $callback = $request->all()['Body']['stkCallback'] ?? null;
+    
+        if (!$callback) {
+            Log::error('Invalid callback payload');
+            return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Success']);
+        }
+    
         $checkoutRequestId = $callback['CheckoutRequestID'];
         $resultCode = $callback['ResultCode'];
         $resultDesc = $callback['ResultDesc'];
-
+    
         $payment = EventPayment::where('checkout_request_id', $checkoutRequestId)->first();
-
+    
         if (!$payment) {
-            Log::warning("No event payment found for CheckoutRequestID: $checkoutRequestId");
+            Log::warning("No event payment found for CheckoutRequestID: {$checkoutRequestId}");
             return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Success']);
         }
-
+    
         if ($resultCode == 0) {
-            $callbackMetadata = collect($callback['CallbackMetadata']['Item']);
-        
-            $mpesaReceiptNumber = $callbackMetadata->firstWhere('Name', 'MpesaReceiptNumber')['Value'] ?? null;
-            $transactionDate = $callbackMetadata->firstWhere('Name', 'TransactionDate')['Value'] ?? null;
-        
+            $metadata = collect($callback['CallbackMetadata']['Item']);
+    
+            $mpesaReceiptNumber = $metadata
+                ->firstWhere('Name', 'MpesaReceiptNumber')['Value'] ?? null;
+    
+            $transactionDate = $metadata
+                ->firstWhere('Name', 'TransactionDate')['Value'] ?? null;
+    
             $ticketCode = strtoupper(Str::random(10));
-        
-            $payment->update([
-                'status' => 'Success',
-                'mpesa_receipt_number' => $mpesaReceiptNumber,
-                'transaction_date' => Carbon::createFromFormat('YmdHis', $transactionDate),
-                'ticket_code' => $ticketCode,
-            ]);
-        
+    
+            // ✅ SAFE FIELD-BY-FIELD UPDATE
+            $payment->status = 'Success';
+            $payment->ticket_code = $ticketCode;
+            $payment->mpesa_receipt_number = $mpesaReceiptNumber;
+            $payment->transaction_date = $transactionDate
+                ? Carbon::createFromFormat('YmdHis', $transactionDate)
+                : now();
+    
+            $payment->save();
+    
             $event = Event::find($payment->event_id);
+    
             if ($event) {
-                $attendeeName = $payment->attendee_name ?? 'email';
-                $emailSent = $this->sendTicket($payment->email, $event, $ticketCode);
-                if ($emailSent) {
-                    Log::info("Ticket sent to {$payment->email} for event {$event->title}");
-                } else {
-                    Log::error("Ticket sending failed for {$payment->email} on event {$event->title}");
-                }
-            } else {
-                Log::error("Event not found for ID: {$payment->event_id}");
+                $attendeeName = $payment->attendee_name
+                    ?: explode('@', $payment->email)[0];
+    
+                $this->sendTicket(
+                    $payment->email,
+                    $event,
+                    $ticketCode,
+                    ucfirst($attendeeName)
+                );
             }
+    
+            Log::info("Event payment SUCCESS for {$checkoutRequestId}");
         } else {
-            $payment->update(['status' => 'Failed']);
-            Log::warning("Event payment failed: $resultDesc for CheckoutRequestID: $checkoutRequestId");
+            $payment->status = 'Failed';
+            $payment->save();
+    
+            Log::warning("Event payment FAILED: {$resultDesc}");
         }
-
+    
         return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Success']);
     }
+
+
 
     /**
      * Generate M-Pesa Access Token

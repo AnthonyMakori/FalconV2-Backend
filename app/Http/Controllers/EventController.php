@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class EventController extends Controller
 {
@@ -13,7 +12,8 @@ class EventController extends Controller
      */
     public function index(Request $request)
     {
-        $events = Event::query()
+        $query = Event::query()
+            ->where('date', '>=', now())
             ->when($request->search, fn ($q) =>
                 $q->where('name', 'like', "%{$request->search}%")
             )
@@ -23,13 +23,20 @@ class EventController extends Controller
             ->when($request->status, fn ($q) =>
                 $q->where('status', $request->status)
             )
-            ->orderBy('date', 'desc')
-            ->paginate(10);
+            ->orderBy('date');
 
-        // Add full poster URL
-        $events->getCollection()->transform(function ($event) {
+        // Use pagination if requested, otherwise return top 5
+        $events = $request->has('paginate')
+            ? $query->paginate(10)
+            : $query->limit(5)->get();
+
+        $eventsCollection = $events instanceof \Illuminate\Pagination\AbstractPaginator
+            ? $events->getCollection()
+            : $events;
+
+        $eventsCollection->transform(function ($event) {
             if ($event->poster) {
-                $event->poster = asset('storage/' . $event->poster);
+                $event->poster_url = asset($event->poster); // now using assets folder URL
             }
             return $event;
         });
@@ -55,15 +62,24 @@ class EventController extends Controller
             'poster'      => 'nullable|image|mimes:jpg,jpeg,png,webp|max:20480',
         ]);
 
+        // Handle poster upload to assets folder
         if ($request->hasFile('poster')) {
-            $data['poster'] = $request->file('poster')
-                ->store('events', 'public');
+            $poster = $request->file('poster');
+            $posterName = time() . '_' . $poster->getClientOriginalName();
+            $posterDir = base_path('assets/events');
+
+            if (!file_exists($posterDir)) {
+                mkdir($posterDir, 0755, true);
+            }
+
+            $poster->move($posterDir, $posterName);
+            $data['poster'] = 'assets/events/' . $posterName;
         }
 
         $event = Event::create($data);
 
         if ($event->poster) {
-            $event->poster = asset('storage/' . $event->poster);
+            $event->poster_url = asset($event->poster);
         }
 
         return response()->json($event, 201);
@@ -75,7 +91,7 @@ class EventController extends Controller
     public function show(Event $event)
     {
         if ($event->poster) {
-            $event->poster = asset('storage/' . $event->poster);
+            $event->poster_url = asset($event->poster);
         }
 
         return response()->json($event);
@@ -98,17 +114,27 @@ class EventController extends Controller
         ]);
 
         if ($request->hasFile('poster')) {
-            if ($event->poster) {
-                Storage::disk('public')->delete($event->poster);
+            // Delete old poster if exists
+            if ($event->poster && file_exists(base_path($event->poster))) {
+                unlink(base_path($event->poster));
             }
-            $data['poster'] = $request->file('poster')
-                ->store('events', 'public');
+
+            $poster = $request->file('poster');
+            $posterName = time() . '_' . $poster->getClientOriginalName();
+            $posterDir = base_path('assets/events');
+
+            if (!file_exists($posterDir)) {
+                mkdir($posterDir, 0755, true);
+            }
+
+            $poster->move($posterDir, $posterName);
+            $data['poster'] = 'assets/events/' . $posterName;
         }
 
         $event->update($data);
 
         if ($event->poster) {
-            $event->poster = asset('storage/' . $event->poster);
+            $event->poster_url = asset($event->poster);
         }
 
         return response()->json($event);
@@ -119,8 +145,8 @@ class EventController extends Controller
      */
     public function destroy(Event $event)
     {
-        if ($event->poster) {
-            Storage::disk('public')->delete($event->poster);
+        if ($event->poster && file_exists(base_path($event->poster))) {
+            unlink(base_path($event->poster));
         }
 
         $event->delete();
