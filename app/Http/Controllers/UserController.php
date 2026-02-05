@@ -40,7 +40,6 @@ class UserController extends Controller
     {
         $query = User::query();
 
-        // 🔍 Search (name or email)
         if ($request->filled('search')) {
             $query->where(function ($q) use ($request) {
                 $q->where('name', 'like', '%' . $request->search . '%')
@@ -48,17 +47,17 @@ class UserController extends Controller
             });
         }
 
-        // 🎭 Role filter
+        // ðŸŽ­ Role filter
         if ($request->filled('role') && $request->role !== 'all') {
             $query->where('role', ucfirst($request->role));
         }
 
-        // 🚦 Status filter
+        // ðŸš¦ Status filter
         if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', ucfirst($request->status));
         }
 
-        // 📄 Select only what frontend needs
+        // ðŸ“„ Select only what frontend needs
         $users = $query->select(
                 'id',
                 'name',
@@ -105,5 +104,9 @@ class UserController extends Controller
         return response()->json([
             'message' => 'User deleted successfully',
         ]);
+    }
+     public function me(Request $request)
+    {
+        return response()->json($request->user());
     }
 }

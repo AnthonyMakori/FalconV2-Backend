@@ -3,38 +3,40 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\WatchProgress;
 
 class WatchProgressController extends Controller
 {
-    public function update(Request $request)
+    public function continueWatching()
     {
-        $request->validate([
-            'movie_id' => 'required|exists:movies,id',
-            'progress_seconds' => 'required|integer',
-            'duration_seconds' => 'required|integer'
-        ]);
+        $user = auth()->user();
 
-        WatchProgress::updateOrCreate(
-            [
-                'user_id' => auth()->id(),
-                'movie_id' => $request->movie_id
-            ],
-            [
-                'progress_seconds' => $request->progress_seconds,
-                'duration_seconds' => $request->duration_seconds,
-                'last_watched_at' => now()
-            ]
-        );
-
-        return response()->json(['message' => 'Progress saved']);
+        return WatchProgress::where('user_id', $user->id)
+            ->whereColumn('progress_seconds', '<', 'duration_seconds')
+            ->with('movie:id,title,thumbnail')
+            ->orderByDesc('last_watched_at')
+            ->limit(10)
+            ->get()
+            ->map(fn ($item) => [
+                'id' => $item->movie->id,
+                'title' => $item->movie->title,
+                'thumbnail' => $item->movie->thumbnail,
+                'progress' => $item->duration_seconds > 0
+                    ? round(($item->progress_seconds / $item->duration_seconds) * 100)
+                    : 0,
+                'lastWatched' => $item->last_watched_at?->diffForHumans(),
+            ]);
     }
 
-    public function list()
+    public function history()
     {
-        return WatchProgress::with('movie')
-            ->where('user_id', auth()->id())
+        $user = auth()->user();
+
+        return WatchProgress::where('user_id', $user->id)
+            ->with('movie:id,title,thumbnail')
             ->orderByDesc('last_watched_at')
             ->get();
     }
 }
+
 
