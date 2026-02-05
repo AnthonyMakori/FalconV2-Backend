@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Merchandise;
@@ -9,12 +9,16 @@ use Illuminate\Http\Request;
 class MerchandiseController extends Controller
 {
     /**
-     * Get all merchandise
+     * GET /api/merchandise
      */
     public function index()
     {
-        $merchandise = Merchandise::all()->map(function ($item) {
-            $item->image_url = $item->image ? asset($item->image) : null;
+        $merchandise = Merchandise::latest()->get();
+
+        $merchandise->transform(function ($item) {
+            if ($item->image) {
+                $item->image_url = asset($item->image); // image stored in assets folder
+            }
             return $item;
         });
 
@@ -22,11 +26,11 @@ class MerchandiseController extends Controller
     }
 
     /**
-     * Store new merchandise
+     * POST /api/merchandise
      */
     public function store(Request $request)
     {
-        $request->validate([
+        $data = $request->validate([
             'name'     => 'required|string|max:255',
             'category' => 'required|string',
             'price'    => 'required|numeric|min:0',
@@ -35,33 +39,25 @@ class MerchandiseController extends Controller
             'image'    => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:20480',
         ]);
 
-        $imagePath = null;
-
+        // Handle image upload to assets folder
         if ($request->hasFile('image')) {
-            $image      = $request->file('image');
-            $imageName  = time() . '_' . $image->getClientOriginalName();
-            $imageDir   = base_path('assets/merchandise');
+            $image = $request->file('image');
+            $imageName = time() . '_' . $image->getClientOriginalName();
+            $imageDir = base_path('assets/merchandise');
 
-            // Create directory if it doesn't exist
             if (!file_exists($imageDir)) {
                 mkdir($imageDir, 0755, true);
             }
 
-            // Move image
             $image->move($imageDir, $imageName);
-
-            // Save relative path
-            $imagePath = 'assets/merchandise/' . $imageName;
+            $data['image'] = 'assets/merchandise/' . $imageName;
         }
 
-        $merchandise = Merchandise::create([
-            'name'     => $request->name,
-            'category' => $request->category,
-            'price'    => $request->price,
-            'stock'    => $request->stock,
-            'status'   => $request->status,
-            'image'    => $imagePath,
-        ]);
+        $merchandise = Merchandise::create($data);
+
+        if ($merchandise->image) {
+            $merchandise->image_url = asset($merchandise->image);
+        }
 
         return response()->json([
             'message' => 'Merchandise created successfully',
@@ -70,23 +66,23 @@ class MerchandiseController extends Controller
     }
 
     /**
-     * Get single merchandise
+     * GET /api/merchandise/{merchandise}
      */
     public function show(Merchandise $merchandise)
     {
-        $merchandise->image_url = $merchandise->image
-            ? asset($merchandise->image)
-            : null;
+        if ($merchandise->image) {
+            $merchandise->image_url = asset($merchandise->image);
+        }
 
         return response()->json($merchandise);
     }
 
     /**
-     * Update merchandise
+     * PUT /api/merchandise/{merchandise}
      */
     public function update(Request $request, Merchandise $merchandise)
     {
-        $request->validate([
+        $data = $request->validate([
             'name'     => 'sometimes|string|max:255',
             'category' => 'sometimes|string',
             'price'    => 'sometimes|numeric|min:0',
@@ -95,27 +91,30 @@ class MerchandiseController extends Controller
             'image'    => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:20480',
         ]);
 
+        // Handle image upload to assets folder
         if ($request->hasFile('image')) {
             // Delete old image if exists
             if ($merchandise->image && file_exists(base_path($merchandise->image))) {
                 unlink(base_path($merchandise->image));
             }
 
-            $image     = $request->file('image');
+            $image = $request->file('image');
             $imageName = time() . '_' . $image->getClientOriginalName();
-            $imageDir  = base_path('assets/merchandise');
+            $imageDir = base_path('assets/merchandise');
 
             if (!file_exists($imageDir)) {
                 mkdir($imageDir, 0755, true);
             }
 
             $image->move($imageDir, $imageName);
-            $merchandise->image = 'assets/merchandise/' . $imageName;
+            $data['image'] = 'assets/merchandise/' . $imageName;
         }
 
-        $merchandise->update(
-            $request->only(['name', 'category', 'price', 'stock', 'status'])
-        );
+        $merchandise->update($data);
+
+        if ($merchandise->image) {
+            $merchandise->image_url = asset($merchandise->image);
+        }
 
         return response()->json([
             'message' => 'Merchandise updated successfully',
@@ -124,7 +123,7 @@ class MerchandiseController extends Controller
     }
 
     /**
-     * Delete merchandise
+     * DELETE /api/merchandise/{merchandise}
      */
     public function destroy(Merchandise $merchandise)
     {
