@@ -4,17 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Purchase extends Model
+class MovieSubtitle extends Model
 {
     protected $fillable = [
-        'phone',
-        'amount',
-        'email',
         'movie_id',
-        'status',
+        'language',
+        'file_path',
     ];
+
     public function movie()
-{
-    return $this->belongsTo(Movie::class);
-}
+    {
+        return $this->belongsTo(Movie::class);
+    }
 }

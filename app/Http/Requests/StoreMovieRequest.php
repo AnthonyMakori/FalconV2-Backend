@@ -6,20 +6,22 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreMovieRequest extends FormRequest
 {
+    public function authorize(): bool
+    {
+        return true;
+    }
+
     public function rules(): array
     {
         return [
             'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'release_year' => 'nullable|integer',
-            'duration' => 'nullable|integer',
-            'language' => 'nullable|string',
-            'genre' => 'nullable|string',
-            'status' => 'required|in:published,draft,archived',
+            'description' => 'required|string',
 
-            'poster' => 'nullable|image|max:2048',
-            'trailer' => 'nullable|mimes:mp4,mov,mkv|max:51200',
-            'movie' => 'nullable|mimes:mp4,mov,mkv|max:102400',
+            'release_year' => 'nullable|digits:4',
+            'duration' => 'nullable|integer',
+            'language' => 'nullable|string|max:255',
+            'genre' => 'required|string|max:255',
+            'status' => 'required|in:draft,published,archived',
 
             'rental_price' => 'nullable|numeric',
             'purchase_price' => 'nullable|numeric',
@@ -27,17 +29,15 @@ class StoreMovieRequest extends FormRequest
             'free_preview' => 'boolean',
             'preview_duration' => 'nullable|integer',
 
-            'seo_title' => 'nullable|string',
+            'poster' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:51200',
+            'trailer' => 'nullable|mimetypes:video/mp4,video/webm|max:204800',
+            'subtitles.*' => 'nullable|mimes:srt,vtt|max:5120',
+
+            'bunny_video_id' => 'nullable|string',
+
+            'seo_title' => 'nullable|string|max:255',
             'seo_description' => 'nullable|string',
             'seo_keywords' => 'nullable|string',
-
-            'casts' => 'array',
-            'casts.*' => 'string',
-
-            'tags' => 'array',
-            'tags.*' => 'string',
-
-            'subtitles.*' => 'file|mimes:srt,vtt'
         ];
     }
 }

@@ -24,6 +24,7 @@ class User extends Authenticatable
         'subscription',
         'total_purchases',
         'role',
+        'profile_image',
     ];
 
     /**
@@ -50,7 +51,7 @@ class User extends Authenticatable
     return $this->hasMany(Purchase::class);
     }
 
-    public function watchlist() {
+    public function watchlists() {
         return $this->hasMany(Watchlist::class);
     }
 
@@ -58,9 +59,14 @@ class User extends Authenticatable
         return $this->hasMany(PurchaseCode::class);
     }
     public function subscriptions()
-{
-    return $this->hasMany(Subscription::class);
-}
+    {
+        return $this->hasMany(Subscription::class);
+    }
+    
+    public function watchProgresses()
+    {
+        return $this->hasMany(WatchProgress::class);
+    }
 
 
 }

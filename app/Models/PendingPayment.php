@@ -18,6 +18,12 @@ class PendingPayment extends Model
         'mpesa_receipt_number',
         'transaction_date',
     ];
+    
+    public function movie()
+        {
+            return $this->belongsTo(Movie::class, 'movie_id');
+        }
+
 }
 
 
