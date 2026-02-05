@@ -157,9 +157,9 @@ Route::prefix('admin')->group(function () {
 
 
 
-//   Route::get('/test', function () {
-//     return response()->json(['message' => 'API is working']);
-// });
+ Route::middleware('auth:api')->get('/me', function (Request $request) {
+    return $request->user();
+});
 
 
 
